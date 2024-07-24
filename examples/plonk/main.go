@@ -44,34 +44,106 @@ type Circuit struct {
 // Define declares the circuit's constraints
 // y == x**e
 func (circuit *Circuit) Define(api frontend.API) error {
-
 	// number of bits of exponent
 	const bitSize = 4000
-
 	// specify constraints
+	output := frontend.Variable(1)
+	bits := api.ToBinary(circuit.E, bitSize)
+	base := circuit.X
+	for i := 0; i < len(bits); i++ {
+		output = api.Select(bits[i], api.Mul(output, base), output)
+		base = api.Mul(base, base)
+	}
+	api.AssertIsEqual(circuit.Y, output)
+	return nil
+}
+
+func (circuit *Circuit) Define2(api frontend.API) error {
+	const bitSize = 32
 	output := frontend.Variable(1)
 	bits := api.ToBinary(circuit.E, bitSize)
 
 	for i := 0; i < len(bits); i++ {
-		// api.Println(fmt.Sprintf("e[%d]", i), bits[i]) // we may print a variable for testing and / or debugging purposes
-
+		api.Println(fmt.Sprintf("e[%d]", i), bits[i]) // we may print a variable for testing and / or debugging purposes
 		if i != 0 {
 			output = api.Mul(output, output)
 		}
+		api.Println("out1->", output)
 		multiply := api.Mul(output, circuit.X)
 		output = api.Select(bits[len(bits)-1-i], multiply, output)
-
+		api.Println("out2->", output, "multiply->", multiply, "X->", circuit.X, "Y->", circuit.Y, "E->", circuit.E)
 	}
-
+	api.Println("Y = ", circuit.Y, "output = ", output)
 	api.AssertIsEqual(circuit.Y, output)
-
 	return nil
 }
 
+func intToBinaryBits(n int) (bits []byte) {
+	for n > 0 {
+		// 将n的最低位添加到bits字符串
+		bits = append(bits, byte(n&1))
+		// 右移n，以检查下一个位
+		n >>= 1
+	}
+	return bits
+}
+
+func my_test_pow(x, e int) int {
+	output := 1
+	bits := intToBinaryBits(e)
+	base := x
+	for i := 0; i < len(bits); i++ {
+		if bits[i] == 1 {
+			output = output * base
+		}
+		base *= base
+	}
+	return output
+}
+
+func test_pow(x, e int) int {
+	/*
+		// specify constraints
+		output := frontend.Variable(1)
+		bits := api.ToBinary(circuit.E, bitSize)
+
+		for i := 0; i < len(bits); i++ {
+			// api.Println(fmt.Sprintf("e[%d]", i), bits[i]) // we may print a variable for testing and / or debugging purposes
+
+			if i != 0 {
+				output = api.Mul(output, output)
+			}
+			multiply := api.Mul(output, circuit.X)
+			output = api.Select(bits[len(bits)-1-i], multiply, output)
+
+		}
+
+		api.AssertIsEqual(circuit.Y, output)
+	*/
+	output := 1
+	bits := intToBinaryBits(e)
+	fmt.Println("bits:", bits)
+	for i := 0; i < len(bits); i++ {
+		if i != 0 {
+			output = output * output
+		}
+		multiply := output * x
+		if bits[i] == 1 {
+			output = multiply
+		}
+	}
+	return output
+}
+
 func main() {
-
+	/*
+		r := test_pow(2, 10)
+		fmt.Println("2^ 10 = ", r)
+		r = my_test_pow(2, 10)
+		fmt.Println("2^ 10 = ", r)
+		return
+	*/
 	var circuit Circuit
-
 	// // building the circuit...
 	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), scs.NewBuilder, &circuit)
 	if err != nil {
@@ -95,8 +167,8 @@ func main() {
 		// while public w is a public data known by the verifier.
 		var w Circuit
 		w.X = 2
-		w.E = 2
-		w.Y = 4
+		w.E = 10
+		w.Y = 1024
 
 		witnessFull, err := frontend.NewWitness(&w, ecc.BN254.ScalarField())
 		if err != nil {
@@ -127,6 +199,7 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+
 	// Wrong data: the proof fails
 	{
 		// Witnesses instantiation. Witness is known only by the prover,

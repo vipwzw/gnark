@@ -3,6 +3,7 @@ package gnark_test
 import (
 	"bytes"
 	"math/big"
+	"sort"
 	"testing"
 
 	"github.com/consensys/gnark-crypto/ecc"
@@ -16,6 +17,7 @@ import (
 	"github.com/consensys/gnark/frontend/cs/scs"
 	"github.com/consensys/gnark/test/unsafekzg"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -198,4 +200,24 @@ func getGroth16Trace(circuit, w frontend.Circuit) (string, error) {
 	log := zerolog.New(&zerolog.ConsoleWriter{Out: &buf, NoColor: true, PartsExclude: []string{zerolog.LevelFieldName, zerolog.TimestampFieldName}})
 	_, err = groth16.Prove(ccs, pk, sw, backend.WithSolverOptions(solver.WithLogger(log)))
 	return buf.String(), err
+}
+
+// 通过生成元生成素数群的所有元素
+func TestGroupGen(t *testing.T) {
+	prime := 13
+	data := generatePrimeGroupElements(prime, 2)
+	sort.Ints(data)
+	for i := 1; i < prime; i++ {
+		assert.Equal(t, i, data[i-1])
+	}
+}
+
+func generatePrimeGroupElements(prime int, generator int) []int {
+	elements := make([]int, 0, prime-1)
+	currentElement := 1
+	for i := 0; i < prime-1; i++ {
+		currentElement = (currentElement * generator) % prime
+		elements = append(elements, currentElement)
+	}
+	return elements
 }
