@@ -49,8 +49,3 @@ $p(x) = x^3 - 3x^2 +2x$
 
 显然，这个公式是成立的，而且，如果prover 不采用用户提供的数据来计算，因为无法计算出k的值，要刚好凑出两个数满足
 $(g^p)^k = g^{p'}$ 是一个概率可以忽略的事件，特别是问题规模足够大的情况下。
-
-<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-<script type="text/x-mathjax-config">
-  MathJax.Hub.Config({ tex2jax: {inlineMath: [['$', '$']]}, messageStyle: "none" });
-</script>
