@@ -21,7 +21,7 @@
 >
 > **verifier**： 随机生成 s , k 两个随机数，计算 $g^s$ 和 $(g^s)^k$, 然后把 $g^s$ 和 $g^{sk}$ 发送给 prover
 >
-> **prover**:  计算 $(g^s)^c$ 其中 c 是多项式的系数，$(g^{sk})^c$, 然后把 $g^{sc}$ 和 $g^{skc}$ 发送给 verifier
+> **prover**:  计算 $(g^s)^c$ 其中 c 是多项式的系数, $(g^{sk})^c$, 然后把 $g^{sc}$ 和 $g^{skc}$ 发送给 verifier
 >
 > **verifier**： 验证 $(g^{sc})^k = g^{skc}$
 
