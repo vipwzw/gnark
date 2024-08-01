@@ -141,7 +141,7 @@ $$f(-x) = even(y)-xodd(y)$$
 
 ## IFFT 逆快速傅立叶变换算法
 
-在做逆快速傅立叶变换前，我们先把根的问题处理一下。对于单位根，我们知道是一个群。设生成元是 $\omega$, 那么n个元素就是: $[\omega^0, \omega^1, \omega^2, \cdots, \omega^{n-1}]$，$f(x)$ 也是一个数组 $[f(\omega^0), f(\omega^1), f(\omega^2), \cdots, f(\omega^{n-1})]$.  如果把系数和 $x，f(x)$ 都写出来就构成了一个方程组:
+在做逆快速傅立叶变换前，我们先把根的问题处理一下。对于单位根，我们知道是一个群。设生成元是 $\omega$, 那么n个元素就是: $[\omega^0, \omega^1, \omega^2, \cdots, \omega^{n-1}]$， $f(x)$ 也是一个数组 $[f(\omega^0), f(\omega^1), f(\omega^2), \cdots, f(\omega^{n-1})]$.  如果把系数和 $x，f(x)$ 都写出来就构成了一个方程组:
 
 $$
 \begin{bmatrix}
