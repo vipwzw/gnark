@@ -31,4 +31,4 @@
 
 ## 应用
 
-稀疏merkle树在很多项目中被用来实现 状态树，比如lisk等项目。他在性能上，证明大小上都要比以太坊的mpt树更好。此外，比特币的 Taproot Assets 也用到了 稀疏merkle树， 还有以太坊的plasma 也用到了 稀疏merkle树。
+稀疏merkle树在很多项目中被用来实现 状态树，比如lisk等项目。他在性能上，证明大小上都要比以太坊的mpt树更好。此外，比特币的 taproot assets 也用到了 稀疏merkle树， 还有以太坊的plasma 也用到了 稀疏merkle树。
