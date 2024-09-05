@@ -35,7 +35,7 @@
    (6+6+6+6+6)mod7=2
 
    (6+6+6+6+6+6)mod7=1
-   
+
    (6+6+6+6+6+6+6)mod7=0
 ```
 
@@ -99,13 +99,13 @@
 
 ## 指数与原根
 
-设 $m\geq1$ , $（a, m）=1$. 使 $a^d\equiv1 (mod\ m)$, 成立的最小的正整数d，就是指数。如果$\delta_m(a)=\varphi(m)$, 那么a 就是 模m的原根。
+设 $m\geq1$ , $（a, m）=1$. 使 $a^d\equiv1 (mod\ m)$, 成立的最小的正整数d，就是指数。如果   $\delta_m(a)=\varphi(m)$, 那么a 就是 模m的原根。
 
-这里 $\varphi(m)$ 是欧拉函数。如果 $Z_m^*$ 是一个群，那么$\varphi(m)$实际上就是群的阶。原根就是群的生成元。
+这里 $\varphi(m)$ 是欧拉函数。如果 $Z_m^*$ 是一个群，那么 $\varphi(m)$ 实际上就是群的阶。原根就是群的生成元。
 
 ## 拉格朗日定理
 
-任意的一个 $\delta_m(a)｜\varphi(m)$ ，也就是元素的阶($\delta_m(a)$)可以整除群的阶。
+任意的一个 $\delta_m(a)｜\varphi(m)$ ，也就是元素的阶( $\delta_m(a)$ )可以整除群的阶。
 
 ## 引理
 
@@ -124,7 +124,7 @@ $\delta_p(g)=[\delta_p(1),\delta_p(2),\cdots,\delta_p(i),\cdots,\delta_p(p-1)]$ 
 因为p是一个素数，所以有: $\varphi(p) = p-1$
 所以一定有 $\delta_p(g)|p-1$, 所以 $\delta_p(g)\leq p-1$.
 
-$\delta_p(g)$ 是所有元素的最大公倍数，所以$\delta_p(i)|\delta_p(g)$, 因而 $1,2,\cdots,i,\cdots,p-1$ 都是同余方程
+$\delta_p(g)$ 是所有元素的最大公倍数，所以 $\delta_p(i)|\delta_p(g)$, 因而 $1,2,\cdots,i,\cdots,p-1$ 都是同余方程
 
 $$
 x^{\delta_p(g)}\equiv1(mod\ p)
