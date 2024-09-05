@@ -169,16 +169,16 @@ $$
 
 $\delta_p(g)=[\delta_p(1),\delta_p(2),\cdots,\delta_p(i),\cdots,\delta_p(p-1)]$ 由上面定理，我们知道这样的g一定存在。下面我们证明这个就是原根。
 
-因为p是一个素数，所以有: $\varphi(p) = p-1$
-所以一定有 $\delta_p(g)|p-1$, 所以 $\delta_p(g)\leq p-1$.
+因为p是一个素数，所以有:  $\varphi(p)=p-1$
+所以一定有 $\delta_p(g)|p-1$ , 所以 $\delta_p(g)\leq p-1$ .
 
-$\delta_p(g)$ 是所有元素的最大公倍数，所以 $\delta_p(i)|\delta_p(g)$, 因而 $1,2,\cdots,i,\cdots,p-1$ 都是同余方程
+$\delta_p(g)$ 是所有元素的最大公倍数，所以  $\delta_p(i)|\delta_p(g)$, 因而 $1,2,\cdots,i,\cdots,p-1$ 都是同余方程
 
 $$
 x^{\delta_p(g)}\equiv1(mod\ p)
 $$
 
-的解，对同余方程不了解的，可以把解带进去就很容易验证等式是成立的。而同余方程的解的个数 $n\leq min(\delta_p(g), p)$, 已知 $\delta_p(g)\leq p-1$, $min(\delta_p(g), p) = \delta_p(g)$, n至少有p-1个解，所以有 $\delta_p(g)\geq p-1$, 所以 $\delta_p(g) = p-1$，所以 $\delta_p(g)$ 就是原根。通过g可以生成所有的元素。$Z_p^*$ 还是一个循环群。
+的解，对同余方程不了解的，可以把解带进去就很容易验证等式是成立的。而同余方程的解的个数 $n\leq min(\delta_p(g), p)$, 已知 $\delta_p(g)\leq p-1$, $min(\delta_p(g), p) = \delta_p(g)$, n至少有p-1个解，所以有 $\delta_p(g)\geq p-1$, 所以 $\delta_p(g) = p-1$，所以 $\delta_p(g)$ 就是原根。通过g可以生成所有的元素. $Z_p^*$ 还是一个循环群。
 
 ## 总结
 
