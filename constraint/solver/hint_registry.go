@@ -2,14 +2,16 @@ package solver
 
 import (
 	"fmt"
+	"maps"
 	"math/big"
 	"sync"
 
+	"github.com/consensys/gnark/internal/hints"
 	"github.com/consensys/gnark/logger"
 )
 
 func init() {
-	RegisterHint(InvZeroHint)
+	RegisterHint(InvZeroHint, hints.Randomize)
 }
 
 var (
@@ -59,18 +61,10 @@ func GetRegisteredHints() []Hint {
 	return ret
 }
 
-func cloneMap[K comparable, V any](src map[K]V) map[K]V {
-	res := make(map[K]V, len(registry))
-	for k, v := range src {
-		res[k] = v
-	}
-	return res
-}
-
 func cloneHintRegistry() map[HintID]Hint {
 	registryM.Lock()
 	defer registryM.Unlock()
-	return cloneMap(registry)
+	return maps.Clone(registry)
 }
 
 // InvZeroHint computes the value 1/a for the single input a. If a == 0, returns 0.

@@ -1,11 +1,13 @@
 package emulated
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
+	limbs "github.com/consensys/gnark/std/internal/limbcomposition"
 )
 
 func (f *Field[T]) wrapHint(nonnativeInputs ...*Element[T]) []frontend.Variable {
@@ -49,24 +51,24 @@ func UnwrapHintWithNativeInput(nativeInputs, nativeOutputs []*big.Int, nonnative
 
 func unwrapHint(isEmulatedInput, isEmulatedOutput bool, nativeInputs, nativeOutputs []*big.Int, nonnativeHint solver.Hint) error {
 	if len(nativeInputs) < 2 {
-		return fmt.Errorf("hint wrapper header is 2 elements")
+		return errors.New("hint wrapper header is 2 elements")
 	}
 	if !nativeInputs[0].IsInt64() || !nativeInputs[1].IsInt64() {
-		return fmt.Errorf("header must be castable to int64")
+		return errors.New("header must be castable to int64")
 	}
 	nbBits := int(nativeInputs[0].Int64())
 	nbLimbs := int(nativeInputs[1].Int64())
 	if len(nativeInputs) < 2+nbLimbs {
-		return fmt.Errorf("hint wrapper header is 2+nbLimbs elements")
+		return errors.New("hint wrapper header is 2+nbLimbs elements")
 	}
 	nonnativeMod := new(big.Int)
-	if err := recompose(nativeInputs[2:2+nbLimbs], uint(nbBits), nonnativeMod); err != nil {
+	if err := limbs.Recompose(nativeInputs[2:2+nbLimbs], uint(nbBits), nonnativeMod); err != nil {
 		return fmt.Errorf("cannot recover nonnative mod: %w", err)
 	}
 	var nonnativeInputs []*big.Int
 	if isEmulatedInput {
 		if !nativeInputs[2+nbLimbs].IsInt64() {
-			return fmt.Errorf("number of nonnative elements must be castable to int64")
+			return errors.New("number of nonnative elements must be castable to int64")
 		}
 		nbInputs := int(nativeInputs[2+nbLimbs].Int64())
 		readPtr := 3 + nbLimbs
@@ -83,7 +85,7 @@ func unwrapHint(isEmulatedInput, isEmulatedOutput bool, nativeInputs, nativeOutp
 				return fmt.Errorf("cannot read %d-th nonnative element", i)
 			}
 			nonnativeInputs[i] = new(big.Int)
-			if err := recompose(nativeInputs[readPtr+1:readPtr+1+currentInputLen], uint(nbBits), nonnativeInputs[i]); err != nil {
+			if err := limbs.Recompose(nativeInputs[readPtr+1:readPtr+1+currentInputLen], uint(nbBits), nonnativeInputs[i]); err != nil {
 				return fmt.Errorf("recompose %d-th element: %w", i, err)
 			}
 			readPtr += 1 + currentInputLen
@@ -100,7 +102,7 @@ func unwrapHint(isEmulatedInput, isEmulatedOutput bool, nativeInputs, nativeOutp
 	var nonnativeOutputs []*big.Int
 	if isEmulatedOutput {
 		if len(nativeOutputs)%nbLimbs != 0 {
-			return fmt.Errorf("output count doesn't divide limb count")
+			return errors.New("output count doesn't divide limb count")
 		}
 		nonnativeOutputs = make([]*big.Int, len(nativeOutputs)/nbLimbs)
 	} else {
@@ -115,7 +117,7 @@ func unwrapHint(isEmulatedInput, isEmulatedOutput bool, nativeInputs, nativeOutp
 	if isEmulatedOutput {
 		for i := range nonnativeOutputs {
 			nonnativeOutputs[i].Mod(nonnativeOutputs[i], nonnativeMod)
-			if err := decompose(nonnativeOutputs[i], uint(nbBits), nativeOutputs[i*nbLimbs:(i+1)*nbLimbs]); err != nil {
+			if err := limbs.Decompose(nonnativeOutputs[i], uint(nbBits), nativeOutputs[i*nbLimbs:(i+1)*nbLimbs]); err != nil {
 				return fmt.Errorf("decompose %d-th element: %w", i, err)
 			}
 		}
@@ -142,6 +144,11 @@ func unwrapHint(isEmulatedInput, isEmulatedOutput bool, nativeInputs, nativeOutp
 //
 // See the example for full written example.
 func (f *Field[T]) NewHint(hf solver.Hint, nbOutputs int, inputs ...*Element[T]) ([]*Element[T], error) {
+	// we need to initialize the inputs before to ensure the constant values are decomposed
+	// into limbs. If inputs are already initialize, then it is no-op.
+	for i := range inputs {
+		inputs[i].Initialize(f.api.Compiler().Field())
+	}
 	nativeInputs := f.wrapHint(inputs...)
 	nbNativeOutputs := int(f.fParams.NbLimbs()) * nbOutputs
 	nativeOutputs, err := f.api.Compiler().NewHint(hf, nbNativeOutputs, nativeInputs...)
@@ -174,6 +181,11 @@ func (f *Field[T]) NewHint(hf solver.Hint, nbOutputs int, inputs ...*Element[T])
 //	        // in the function we have access to both native and nonantive modulus
 //	    })}
 func (f *Field[T]) NewHintWithNativeOutput(hf solver.Hint, nbOutputs int, inputs ...*Element[T]) ([]frontend.Variable, error) {
+	// we need to initialize the inputs before to ensure the constant values are decomposed
+	// into limbs. If inputs are already initialize, then it is no-op.
+	for i := range inputs {
+		inputs[i].Initialize(f.api.Compiler().Field())
+	}
 	nativeInputs := f.wrapHint(inputs...)
 	nbNativeOutputs := nbOutputs
 	nativeOutputs, err := f.api.Compiler().NewHint(hf, nbNativeOutputs, nativeInputs...)

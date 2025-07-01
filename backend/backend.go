@@ -1,16 +1,5 @@
-// Copyright 2020 ConsenSys AG
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright 2020-2025 Consensys Software Inc.
+// Licensed under the Apache License, Version 2.0. See the LICENSE file for details.
 
 // Package backend implements Zero Knowledge Proof systems: it consumes circuit compiled with gnark/frontend.
 package backend
@@ -45,6 +34,18 @@ func (id ID) String() string {
 		return "plonk"
 	default:
 		return "unknown"
+	}
+}
+
+// IDFromString returns the ID of a proof system from its string representation
+func IDFromString(s string) ID {
+	switch s {
+	case "groth16":
+		return GROTH16
+	case "plonk":
+		return PLONK
+	default:
+		return UNKNOWN
 	}
 }
 
@@ -126,7 +127,7 @@ func WithProverKZGFoldingHashFunction(hFunc hash.Hash) ProverOption {
 // tag and the ICICLE dependencies are properly installed. See [ICICLE] for
 // installation description.
 //
-// [ICICLE]: https://github.com/ingonyama-zk/icicle
+// [ICICLE]: https://github.com/ingonyama-zk/icicle-gnark
 func WithIcicleAcceleration() ProverOption {
 	return func(pc *ProverConfig) error {
 		pc.Accelerator = "icicle"

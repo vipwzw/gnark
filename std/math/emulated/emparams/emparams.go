@@ -9,6 +9,23 @@
 //	func (SmallField) BitsPerLimb() uint { return 11 }
 //	func (SmallField) IsPrime() bool { return true }
 //	func (SmallField) Modulus() *big.Int { return big.NewInt(1032) }
+//
+// If in addition the parameters should be aware of the underlying native field,
+// then the type should implement [DynamicFieldParams] interface. For example,
+// by adding the methods:
+//
+//	 func (SmallField) NbLimbsDynamic(field *big.Int) uint {
+//	     if smallfields.IsSmallField(field) {
+//		     return 2
+//	     }
+//	     return 1
+//	 }
+//	 func (SmallField) BitsPerLimbDynamic(field *big.Int) uint {
+//		if smallfields.IsSmallField(field) {
+//			return 6
+//	    }
+//	    return 11
+//	 }
 package emparams
 
 import (
@@ -17,6 +34,7 @@ import (
 
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/field/goldilocks"
+	"github.com/consensys/gnark/internal/smallfields"
 )
 
 type fourLimbPrimeField struct{}
@@ -24,24 +42,83 @@ type fourLimbPrimeField struct{}
 func (fourLimbPrimeField) NbLimbs() uint     { return 4 }
 func (fourLimbPrimeField) BitsPerLimb() uint { return 64 }
 func (fourLimbPrimeField) IsPrime() bool     { return true }
+func (f fourLimbPrimeField) NbLimbsDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 26
+	}
+	return f.NbLimbs()
+}
+func (f fourLimbPrimeField) BitsPerLimbDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 10
+	}
+	return f.BitsPerLimb()
+}
 
 type fiveLimbPrimeField struct{}
 
 func (fiveLimbPrimeField) NbLimbs() uint     { return 5 }
 func (fiveLimbPrimeField) BitsPerLimb() uint { return 64 }
 func (fiveLimbPrimeField) IsPrime() bool     { return true }
+func (f fiveLimbPrimeField) NbLimbsDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 20
+	}
+	return f.NbLimbs()
+}
+func (f fiveLimbPrimeField) BitsPerLimbDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 16
+	}
+	return f.BitsPerLimb()
+}
 
 type sixLimbPrimeField struct{}
 
 func (sixLimbPrimeField) NbLimbs() uint     { return 6 }
 func (sixLimbPrimeField) BitsPerLimb() uint { return 64 }
 func (sixLimbPrimeField) IsPrime() bool     { return true }
+func (f sixLimbPrimeField) NbLimbsDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 24
+	}
+	return f.NbLimbs()
+}
+func (f sixLimbPrimeField) BitsPerLimbDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 16
+	}
+	return f.BitsPerLimb()
+}
 
 type twelveLimbPrimeField struct{}
 
 func (twelveLimbPrimeField) NbLimbs() uint     { return 12 }
 func (twelveLimbPrimeField) BitsPerLimb() uint { return 64 }
 func (twelveLimbPrimeField) IsPrime() bool     { return true }
+func (f twelveLimbPrimeField) NbLimbsDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 48
+	}
+	return f.NbLimbs()
+}
+func (f twelveLimbPrimeField) BitsPerLimbDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 16
+	}
+	return f.BitsPerLimb()
+}
+
+type oneLimbPrimeField struct{}
+
+func (oneLimbPrimeField) NbLimbs() uint { return 1 }
+func (oneLimbPrimeField) IsPrime() bool { return true }
+func (f oneLimbPrimeField) NbLimbsDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 4
+	}
+	return f.NbLimbs()
+}
 
 // Goldilocks provides type parametrization for field emulation:
 //   - limbs: 1
@@ -51,12 +128,16 @@ func (twelveLimbPrimeField) IsPrime() bool     { return true }
 //
 //	0xffffffff00000001 (base 16)
 //	18446744069414584321 (base 10)
-type Goldilocks struct{}
+type Goldilocks struct{ oneLimbPrimeField }
 
-func (fp Goldilocks) NbLimbs() uint     { return 1 }
-func (fp Goldilocks) BitsPerLimb() uint { return 64 }
-func (fp Goldilocks) IsPrime() bool     { return true }
-func (fp Goldilocks) Modulus() *big.Int { return goldilocks.Modulus() }
+func (Goldilocks) BitsPerLimb() uint { return 64 }
+func (Goldilocks) Modulus() *big.Int { return goldilocks.Modulus() }
+func (Goldilocks) BitsPerLimbDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 16
+	}
+	return 64
+}
 
 // Secp256k1Fp provides type parametrization for field emulation:
 //   - limbs: 4
@@ -70,7 +151,7 @@ func (fp Goldilocks) Modulus() *big.Int { return goldilocks.Modulus() }
 // This is the base field of the SECP256k1 curve.
 type Secp256k1Fp struct{ fourLimbPrimeField }
 
-func (fp Secp256k1Fp) Modulus() *big.Int { return ecc.SECP256K1.BaseField() }
+func (Secp256k1Fp) Modulus() *big.Int { return ecc.SECP256K1.BaseField() }
 
 // Secp256k1Fr provides type parametrization for field emulation:
 //   - limbs: 4
@@ -84,7 +165,7 @@ func (fp Secp256k1Fp) Modulus() *big.Int { return ecc.SECP256K1.BaseField() }
 // This is the scalar field of the SECP256k1 curve.
 type Secp256k1Fr struct{ fourLimbPrimeField }
 
-func (fp Secp256k1Fr) Modulus() *big.Int { return ecc.SECP256K1.ScalarField() }
+func (Secp256k1Fr) Modulus() *big.Int { return ecc.SECP256K1.ScalarField() }
 
 // BN254Fp provides type parametrization for field emulation:
 //   - limbs: 4
@@ -98,7 +179,7 @@ func (fp Secp256k1Fr) Modulus() *big.Int { return ecc.SECP256K1.ScalarField() }
 // This is the base field of the BN254 curve.
 type BN254Fp struct{ fourLimbPrimeField }
 
-func (fp BN254Fp) Modulus() *big.Int { return ecc.BN254.BaseField() }
+func (BN254Fp) Modulus() *big.Int { return ecc.BN254.BaseField() }
 
 // BN254Fr provides type parametrization for field emulation:
 //   - limbs: 4
@@ -112,7 +193,7 @@ func (fp BN254Fp) Modulus() *big.Int { return ecc.BN254.BaseField() }
 // This is the scalar field of the BN254 curve.
 type BN254Fr struct{ fourLimbPrimeField }
 
-func (fp BN254Fr) Modulus() *big.Int { return ecc.BN254.ScalarField() }
+func (BN254Fr) Modulus() *big.Int { return ecc.BN254.ScalarField() }
 
 // BLS12377Fp provides type parametrization for field emulation:
 //   - limbs: 6
@@ -126,7 +207,7 @@ func (fp BN254Fr) Modulus() *big.Int { return ecc.BN254.ScalarField() }
 // This is the base field of the BLS12-377 curve.
 type BLS12377Fp struct{ sixLimbPrimeField }
 
-func (fp BLS12377Fp) Modulus() *big.Int { return ecc.BLS12_377.BaseField() }
+func (BLS12377Fp) Modulus() *big.Int { return ecc.BLS12_377.BaseField() }
 
 // BLS12377Fr provides type parametrization for field emulation:
 //   - limbs: 4
@@ -140,7 +221,7 @@ func (fp BLS12377Fp) Modulus() *big.Int { return ecc.BLS12_377.BaseField() }
 // This is the scalar field of the BLS12-377 curve.
 type BLS12377Fr struct{ fourLimbPrimeField }
 
-func (fr BLS12377Fr) Modulus() *big.Int { return ecc.BLS12_377.ScalarField() }
+func (BLS12377Fr) Modulus() *big.Int { return ecc.BLS12_377.ScalarField() }
 
 // BLS12381Fp provides type parametrization for field emulation:
 //   - limbs: 6
@@ -154,7 +235,7 @@ func (fr BLS12377Fr) Modulus() *big.Int { return ecc.BLS12_377.ScalarField() }
 // This is the base field of the BLS12-381 curve.
 type BLS12381Fp struct{ sixLimbPrimeField }
 
-func (fp BLS12381Fp) Modulus() *big.Int { return ecc.BLS12_381.BaseField() }
+func (BLS12381Fp) Modulus() *big.Int { return ecc.BLS12_381.BaseField() }
 
 // BLS12381Fr provides type parametrization for field emulation:
 //   - limbs: 4
@@ -168,7 +249,7 @@ func (fp BLS12381Fp) Modulus() *big.Int { return ecc.BLS12_381.BaseField() }
 // This is the scalar field of the BLS12-381 curve.
 type BLS12381Fr struct{ fourLimbPrimeField }
 
-func (fp BLS12381Fr) Modulus() *big.Int { return ecc.BLS12_381.ScalarField() }
+func (BLS12381Fr) Modulus() *big.Int { return ecc.BLS12_381.ScalarField() }
 
 // P256Fp provides type parametrization for field emulation:
 //   - limbs: 4
@@ -238,7 +319,7 @@ func (P384Fr) Modulus() *big.Int { return elliptic.P384().Params().N }
 // This is the base field of the BW6-761 curve.
 type BW6761Fp struct{ twelveLimbPrimeField }
 
-func (fp BW6761Fp) Modulus() *big.Int { return ecc.BW6_761.BaseField() }
+func (BW6761Fp) Modulus() *big.Int { return ecc.BW6_761.BaseField() }
 
 // BW6761Fr provides type parametrization for field emulation:
 //   - limbs: 6
@@ -252,7 +333,7 @@ func (fp BW6761Fp) Modulus() *big.Int { return ecc.BW6_761.BaseField() }
 // This is the scalar field of the BW6-761 curve.
 type BW6761Fr struct{ sixLimbPrimeField }
 
-func (fp BW6761Fr) Modulus() *big.Int { return ecc.BW6_761.ScalarField() }
+func (BW6761Fr) Modulus() *big.Int { return ecc.BW6_761.ScalarField() }
 
 // BLS24315Fp provides type parametrization for field emulation:
 //   - limbs: 5
@@ -266,7 +347,7 @@ func (fp BW6761Fr) Modulus() *big.Int { return ecc.BW6_761.ScalarField() }
 // This is the base field of the BLS24-315 curve.
 type BLS24315Fp struct{ fiveLimbPrimeField }
 
-func (fp BLS24315Fp) Modulus() *big.Int { return ecc.BLS24_315.BaseField() }
+func (BLS24315Fp) Modulus() *big.Int { return ecc.BLS24_315.BaseField() }
 
 // BLS24315Fr provides type parametrization for field emulation:
 //   - limbs: 4
@@ -280,9 +361,37 @@ func (fp BLS24315Fp) Modulus() *big.Int { return ecc.BLS24_315.BaseField() }
 // This is the scalar field of the BLS24-315 curve.
 type BLS24315Fr struct{ fourLimbPrimeField }
 
-func (fr BLS24315Fr) Modulus() *big.Int { return ecc.BLS24_315.ScalarField() }
+func (BLS24315Fr) Modulus() *big.Int { return ecc.BLS24_315.ScalarField() }
 
-// Mod1e4096 provides type parametrization for emulated aritmetic:
+// STARKCurveFp provides type parametrization for field emulation:
+//   - limbs: 4
+//   - limb width: 64 bits
+//
+// The prime modulus for type parametrisation is:
+//
+//	0x800000000000011000000000000000000000000000000000000000000000001 (base 16)
+//	3618502788666131213697322783095070105623107215331596699973092056135872020481 (base 10)
+//
+// This is the base field of the STARK curve.
+type STARKCurveFp struct{ fourLimbPrimeField }
+
+func (STARKCurveFp) Modulus() *big.Int { return ecc.STARK_CURVE.BaseField() }
+
+// STARKCurveFr provides type parametrization for field emulation:
+//   - limbs: 4
+//   - limb width: 64 bits
+//
+// The prime modulus for type parametrisation is:
+//
+//	0x800000000000010ffffffffffffffffb781126dcae7b2321e66a241adc64d2f (base 16)
+//	3618502788666131213697322783095070105526743751716087489154079457884512865583 (base 10)
+//
+// This is the scalar field of the STARK curve.
+type STARKCurveFr struct{ fourLimbPrimeField }
+
+func (STARKCurveFr) Modulus() *big.Int { return ecc.STARK_CURVE.ScalarField() }
+
+// Mod1e4096 provides type parametrization for emulated arithmetic:
 //   - limbs: 64
 //   - limb width: 64 bits
 //
@@ -300,8 +409,20 @@ func (Mod1e4096) Modulus() *big.Int {
 	val, _ := new(big.Int).SetString("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
 	return val
 }
+func (f Mod1e4096) NbLimbsDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 256
+	}
+	return f.NbLimbs()
+}
+func (f Mod1e4096) BitsPerLimbDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 16
+	}
+	return f.BitsPerLimb()
+}
 
-// Mod1e512 provides type parametrization for emulated aritmetic:
+// Mod1e512 provides type parametrization for emulated arithmetic:
 //   - limbs: 8
 //   - limb width: 64 bits
 //
@@ -319,8 +440,20 @@ func (Mod1e512) Modulus() *big.Int {
 	val, _ := new(big.Int).SetString("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
 	return val
 }
+func (f Mod1e512) NbLimbsDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 32
+	}
+	return f.NbLimbs()
+}
+func (f Mod1e512) BitsPerLimbDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 16
+	}
+	return f.BitsPerLimb()
+}
 
-// Mod1e256 provides type parametrization for emulated aritmetic:
+// Mod1e256 provides type parametrization for emulated arithmetic:
 //   - limbs: 4
 //   - limb width: 64 bits
 //
@@ -337,4 +470,72 @@ func (Mod1e256) IsPrime() bool     { return false }
 func (Mod1e256) Modulus() *big.Int {
 	val, _ := new(big.Int).SetString("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
 	return val
+}
+func (f Mod1e256) NbLimbsDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 16
+	}
+	return f.NbLimbs()
+}
+func (f Mod1e256) BitsPerLimbDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 16
+	}
+	return f.BitsPerLimb()
+}
+
+// BabyBear provides type parametrization for field emulation:
+//   - limbs: 1
+//   - limb width: 31 bits
+//
+// The prime modulus for type parametrisation is:
+//
+//	15*2^27+1
+//	0x78000001 (base 16)
+//	2013265921 (base 10)
+//
+// The field has 2-adicity of 27.
+type BabyBear struct{ oneLimbPrimeField }
+
+func (BabyBear) BitsPerLimb() uint { return 31 }
+func (BabyBear) Modulus() *big.Int { return big.NewInt(2013265921) }
+func (f BabyBear) NbLimbsDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 2
+	}
+	return f.NbLimbs()
+}
+func (f BabyBear) BitsPerLimbDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 16
+	}
+	return f.BitsPerLimb()
+}
+
+// KoalaBear provides type parametrization for field emulation:
+//   - limbs: 1
+//   - limb width: 31 bits
+//
+// The prime modulus for type parametrisation is:
+//
+//	2^31-2^24+1
+//	0x7f000001 (base 16)
+//	2130706433 (base 10)
+//
+// The field has 2-adicity of 24.
+type KoalaBear struct{ oneLimbPrimeField }
+
+func (KoalaBear) BitsPerLimb() uint { return 31 }
+func (KoalaBear) Modulus() *big.Int { return big.NewInt(2130706433) }
+func (f KoalaBear) NbLimbsDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 2
+	}
+	return f.NbLimbs()
+}
+func (f KoalaBear) BitsPerLimbDynamic(field *big.Int) uint {
+	if smallfields.IsSmallField(field) {
+		return 16
+	}
+	return f.BitsPerLimb()
 }

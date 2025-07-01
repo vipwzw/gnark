@@ -1,16 +1,5 @@
-// Copyright 2020 ConsenSys AG
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright 2020-2025 Consensys Software Inc.
+// Licensed under the Apache License, Version 2.0. See the LICENSE file for details.
 
 // Package plonk implements PLONK Zero Knowledge Proof system.
 //
@@ -70,6 +59,9 @@ import (
 type Proof interface {
 	io.WriterTo
 	io.ReaderFrom
+
+	// Raw methods for faster serialization-deserialization. Does not perform checks on the data.
+	// Only use if you are sure of the data you are reading comes from trusted source.
 	gnarkio.WriterRawTo
 }
 
@@ -79,8 +71,13 @@ type Proof interface {
 type ProvingKey interface {
 	io.WriterTo
 	io.ReaderFrom
+
+	// Raw methods for faster serialization-deserialization. Does not perform checks on the data.
+	// Only use if you are sure of the data you are reading comes from trusted source.
 	gnarkio.WriterRawTo
 	gnarkio.UnsafeReaderFrom
+
+	// VerifyingKey returns the corresponding VerifyingKey.
 	VerifyingKey() interface{}
 }
 
@@ -90,8 +87,12 @@ type ProvingKey interface {
 type VerifyingKey interface {
 	io.WriterTo
 	io.ReaderFrom
+
+	// Raw methods for faster serialization-deserialization. Does not perform checks on the data.
+	// Only use if you are sure of the data you are reading comes from trusted source.
 	gnarkio.WriterRawTo
 	gnarkio.UnsafeReaderFrom
+
 	// VerifyingKey are the methods required for generating the Solidity
 	// verifier contract from the VerifyingKey. This will return an error if not
 	// supported on the CurveID().

@@ -312,7 +312,7 @@ type VerifyingKey[FR emulated.FieldParams, G1El algebra.G1ElementT, G2El algebra
 }
 
 // ValueOfBaseVerifyingKey assigns the base verification key from the witness.
-// Use one of the verifiaction keys for the same-sized circuits.
+// Use one of the verification keys for the same-sized circuits.
 func ValueOfBaseVerifyingKey[FR emulated.FieldParams, G1El algebra.G1ElementT, G2El algebra.G2ElementT](vk backend_plonk.VerifyingKey) (BaseVerifyingKey[FR, G1El, G2El], error) {
 	var ret BaseVerifyingKey[FR, G1El, G2El]
 	var err error
@@ -1078,7 +1078,7 @@ func (v *Verifier[FR, G1El, G2El, GtEl]) AssertSameProofs(vk VerifyingKey[FR, G1
 // AssertDifferentProofs asserts the validity of different proofs for different
 // circuits. We define the base verification key bvk and per-circuit part in
 // cvks. The selector which verification key to use ise given in slice switches.
-// The proofs and witnesses are given in the argumens and must correspond to
+// The proofs and witnesses are given in the arguments and must correspond to
 // each other.
 func (v *Verifier[FR, G1El, G2El, GtEl]) AssertDifferentProofs(bvk BaseVerifyingKey[FR, G1El, G2El], cvks []CircuitVerifyingKey[FR, G1El],
 	switches []frontend.Variable, proofs []Proof[FR, G1El, G2El], witnesses []Witness[FR], opts ...VerifierOption) error {
@@ -1221,6 +1221,8 @@ func (v *Verifier[FR, G1El, G2El, GtEl]) SwitchVerificationKey(bvk BaseVerifying
 		return ret, fmt.Errorf("no circuit verification keys given")
 	}
 	if len(cvks) == 1 {
+		// we don't need to switch. But the index needs to be 0.
+		v.api.AssertIsEqual(idx, 0)
 		return VerifyingKey[FR, G1El, G2El]{
 			BaseVerifyingKey:    bvk,
 			CircuitVerifyingKey: cvks[0],

@@ -1,18 +1,5 @@
-/*
-Copyright © 2020 ConsenSys
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2020-2025 Consensys Software Inc.
+// Licensed under the Apache License, Version 2.0. See the LICENSE file for details.
 
 package fields_bls12377
 
@@ -134,7 +121,7 @@ func (e *E12) Add(api frontend.API, e1, e2 E12) *E12 {
 	return e
 }
 
-// Sub substracts 2 elmts in Fp12
+// Sub subtracts 2 elmts in Fp12
 func (e *E12) Sub(api frontend.API, e1, e2 E12) *E12 {
 	e.C0.Sub(api, e1.C0, e2.C0)
 	e.C1.Sub(api, e1.C1, e2.C1)

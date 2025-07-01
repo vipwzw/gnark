@@ -11,6 +11,10 @@ import (
 
 // Div computes a/b and returns it. It uses [DivHint] as a hint function.
 func (f *Field[T]) Div(a, b *Element[T]) *Element[T] {
+	// fast path when dividing 0
+	if len(a.Limbs) == 0 {
+		return f.Zero()
+	}
 	return f.reduceAndOp(f.div, f.divPreCond, a, b)
 }
 
@@ -70,6 +74,10 @@ func (f *Field[T]) inverse(a, _ *Element[T], _ uint) *Element[T] {
 
 // Sqrt computes square root of a and returns it. It uses [SqrtHint].
 func (f *Field[T]) Sqrt(a *Element[T]) *Element[T] {
+	// fast path when input is zero
+	if len(a.Limbs) == 0 {
+		return f.Zero()
+	}
 	return f.reduceAndOp(f.sqrt, f.sqrtPreCond, a, nil)
 }
 
@@ -116,7 +124,7 @@ func (f *Field[T]) add(a, b *Element[T], nextOverflow uint) *Element[T] {
 	bb, bConst := f.constantValue(b)
 	if aConst && bConst {
 		ba.Add(ba, bb).Mod(ba, f.fParams.Modulus())
-		return newConstElement[T](ba)
+		return newConstElement[T](f.api.Compiler().Field(), ba, false)
 	}
 
 	nbLimbs := max(len(a.Limbs), len(b.Limbs))
@@ -184,15 +192,14 @@ func (f *Field[T]) sub(a, b *Element[T], nextOverflow uint) *Element[T] {
 	bb, bConst := f.constantValue(b)
 	if aConst && bConst {
 		ba.Sub(ba, bb).Mod(ba, f.fParams.Modulus())
-		return newConstElement[T](ba)
+		return newConstElement[T](f.api.Compiler().Field(), ba, false)
 	}
 
 	// first we have to compute padding to ensure that the subtraction does not
 	// underflow.
-	var fp T
-	nbLimbs := max(len(a.Limbs), len(b.Limbs))
+	nbLimbs := max(len(a.Limbs), len(b.Limbs), int(f.fParams.NbLimbs()))
 	limbs := make([]frontend.Variable, nbLimbs)
-	padLimbs := subPadding(fp.Modulus(), fp.BitsPerLimb(), b.overflow, uint(nbLimbs))
+	padLimbs := subPadding(f.fParams.Modulus(), f.fParams.BitsPerLimb(), b.overflow, uint(nbLimbs))
 	for i := range limbs {
 		limbs[i] = padLimbs[i]
 		if i < len(a.Limbs) {
@@ -268,7 +275,7 @@ func (f *Field[T]) Lookup2(b0, b1 frontend.Variable, a, b, c, d *Element[T]) *El
 	bNormLimbs := normalize(b.Limbs)
 	cNormLimbs := normalize(c.Limbs)
 	dNormLimbs := normalize(d.Limbs)
-	for i := range a.Limbs {
+	for i := range nbLimbs {
 		e.Limbs[i] = f.api.Lookup2(b0, b1, aNormLimbs[i], bNormLimbs[i], cNormLimbs[i], dNormLimbs[i])
 	}
 	return e
@@ -317,7 +324,7 @@ func (f *Field[T]) Mux(sel frontend.Variable, inputs ...*Element[T]) *Element[T]
 		}
 	}
 	e := f.newInternalElement(make([]frontend.Variable, nbLimbs), overflow)
-	for i := range inputs[0].Limbs {
+	for i := range nbLimbs {
 		e.Limbs[i] = selector.Mux(f.api, sel, normLimbsTransposed[i]...)
 	}
 	return e

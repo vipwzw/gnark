@@ -20,14 +20,18 @@ type ExampleCurveCircuit[Base, Scalar emulated.FieldParams] struct {
 func (c *ExampleCurveCircuit[B, S]) Define(api frontend.API) error {
 	curve, err := sw_emulated.New[B, S](api, sw_emulated.GetCurveParams[emulated.Secp256k1Fp]())
 	if err != nil {
-		panic("initalize new curve")
+		panic("initialize new curve")
+	}
+	scalarField, err := emulated.NewField[S](api)
+	if err != nil {
+		panic("initialize new field")
 	}
 	G := curve.Generator()
-	scalar4 := emulated.ValueOf[S](4)
-	g4 := curve.ScalarMul(G, &scalar4) // 4*G
-	scalar5 := emulated.ValueOf[S](5)
-	g5 := curve.ScalarMul(G, &scalar5) // 5*G
-	g9 := curve.AddUnified(g4, g5)     // 9*G
+	scalar4 := scalarField.NewElement(4)
+	g4 := curve.ScalarMul(G, scalar4) // 4*G
+	scalar5 := scalarField.NewElement(5)
+	g5 := curve.ScalarMul(G, scalar5) // 5*G
+	g9 := curve.AddUnified(g4, g5)    // 9*G
 	curve.AssertIsEqual(g9, &c.Res)
 	return nil
 }

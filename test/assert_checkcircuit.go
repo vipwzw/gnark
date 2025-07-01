@@ -1,8 +1,6 @@
 package test
 
 import (
-	"crypto/sha256"
-
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
@@ -12,6 +10,7 @@ import (
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/schema"
+	"github.com/consensys/gnark/logger"
 	"github.com/consensys/gnark/test/unsafekzg"
 )
 
@@ -33,6 +32,7 @@ import (
 func (assert *Assert) CheckCircuit(circuit frontend.Circuit, opts ...TestingOption) {
 	// get the testing configuration
 	opt := assert.options(opts...)
+	log := logger.Logger()
 
 	// for each {curve, backend} tuple
 	for _, curve := range opt.curves {
@@ -50,7 +50,7 @@ func (assert *Assert) CheckCircuit(circuit frontend.Circuit, opts ...TestingOpti
 				// check that the assignment is valid with the test engine
 				if !opt.skipTestEngine {
 					err := IsSolved(circuit, w.assignment, curve.ScalarField())
-					assert.noError(err, &w)
+					assert.noError(curve.ScalarField(), err, &w)
 				}
 			}
 
@@ -61,7 +61,7 @@ func (assert *Assert) CheckCircuit(circuit frontend.Circuit, opts ...TestingOpti
 				// check that the assignment is invalid with the test engine
 				if !opt.skipTestEngine {
 					err := IsSolved(circuit, w.assignment, curve.ScalarField())
-					assert.error(err, &w)
+					assert.error(curve.ScalarField(), err, &w)
 				}
 			}
 
@@ -74,7 +74,7 @@ func (assert *Assert) CheckCircuit(circuit frontend.Circuit, opts ...TestingOpti
 
 					// 1- check that the circuit compiles
 					ccs, err := assert.compile(circuit, curve, b, opt.compileOpts)
-					assert.noError(err, nil)
+					assert.noError(curve.ScalarField(), err, nil)
 
 					// TODO @gbotrel check serialization round trip with constraint system.
 
@@ -85,7 +85,7 @@ func (assert *Assert) CheckCircuit(circuit frontend.Circuit, opts ...TestingOpti
 							w := w
 							assert.Run(func(assert *Assert) {
 								_, err = ccs.Solve(w.full, opt.solverOpts...)
-								assert.error(err, &w)
+								assert.error(curve.ScalarField(), err, &w)
 							}, "invalid_witness")
 						}
 
@@ -93,7 +93,7 @@ func (assert *Assert) CheckCircuit(circuit frontend.Circuit, opts ...TestingOpti
 							w := w
 							assert.Run(func(assert *Assert) {
 								_, err = ccs.Solve(w.full, opt.solverOpts...)
-								assert.noError(err, &w)
+								assert.noError(curve.ScalarField(), err, &w)
 							}, "valid_witness")
 						}
 
@@ -116,7 +116,7 @@ func (assert *Assert) CheckCircuit(circuit frontend.Circuit, opts ...TestingOpti
 
 					// proof system setup.
 					pk, vk, pkBuilder, vkBuilder, proofBuilder, err := concreteBackend.setup(ccs, curve)
-					assert.noError(err, nil)
+					assert.noError(curve.ScalarField(), err, nil)
 
 					// for each valid witness, run the prover and verifier
 					for _, w := range validWitnesses {
@@ -127,16 +127,21 @@ func (assert *Assert) CheckCircuit(circuit frontend.Circuit, opts ...TestingOpti
 							verifierOpts := opt.verifierOpts
 							if b == backend.GROTH16 {
 								// currently groth16 Solidity checker only supports circuits with up to 1 commitment
+								if len(ccs.GetCommitments().CommitmentIndexes()) > 1 {
+									log.Warn().
+										Int("nb_commitments", len(ccs.GetCommitments().CommitmentIndexes())).
+										Msg("skipping solidity check, too many commitments")
+								}
 								checkSolidity = checkSolidity && (len(ccs.GetCommitments().CommitmentIndexes()) <= 1)
-								// additionally, we use sha256 as hash to field (fixed in Solidity contract)
-								proverOpts = append(proverOpts, backend.WithProverHashToFieldFunction(sha256.New()))
-								verifierOpts = append(verifierOpts, backend.WithVerifierHashToFieldFunction(sha256.New()))
+								// set the default hash function in case of	custom hash function not set. This is to ensure that the proof can be verified by gnark-solidity-checker
+								proverOpts = append([]backend.ProverOption{solidity.WithProverTargetSolidityVerifier(b)}, opt.proverOpts...)
+								verifierOpts = append([]backend.VerifierOption{solidity.WithVerifierTargetSolidityVerifier(b)}, opt.verifierOpts...)
 							}
 							proof, err := concreteBackend.prove(ccs, pk, w.full, proverOpts...)
-							assert.noError(err, &w)
+							assert.noError(curve.ScalarField(), err, &w)
 
 							err = concreteBackend.verify(proof, vk, w.public, verifierOpts...)
-							assert.noError(err, &w)
+							assert.noError(curve.ScalarField(), err, &w)
 
 							if checkSolidity {
 								// check that the proof can be verified by gnark-solidity-checker
@@ -157,7 +162,7 @@ func (assert *Assert) CheckCircuit(circuit frontend.Circuit, opts ...TestingOpti
 						w := w
 						assert.Run(func(assert *Assert) {
 							_, err := concreteBackend.prove(ccs, pk, w.full, opt.proverOpts...)
-							assert.error(err, &w)
+							assert.error(curve.ScalarField(), err, &w)
 						}, "invalid_witness")
 					}
 
@@ -212,16 +217,16 @@ func (assert *Assert) parseAssignment(circuit frontend.Circuit, assignment front
 
 		// count number of element in witness.
 		// if too many, we don't do JSON serialization.
-		s, err := schema.Walk(assignment, tVariable, nil)
+		s, err := schema.Walk(curve.ScalarField(), assignment, tVariable, nil)
 		assert.NoError(err)
 
 		if s.Public+s.Secret <= serializationThreshold {
 			assert.Run(func(assert *Assert) {
-				s := lazySchema(circuit)()
+				s := lazySchema(curve.ScalarField(), circuit)()
 				assert.marshalWitnessJSON(full, s, curve, false)
 			}, curve.String(), "marshal/json")
 			assert.Run(func(assert *Assert) {
-				s := lazySchema(circuit)()
+				s := lazySchema(curve.ScalarField(), circuit)()
 				assert.marshalWitnessJSON(public, s, curve, true)
 			}, curve.String(), "marshal-public/json")
 		}

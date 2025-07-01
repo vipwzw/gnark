@@ -1,14 +1,18 @@
 package emulated
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
 
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/internal/kvstore"
+	"github.com/consensys/gnark/internal/smallfields"
 	"github.com/consensys/gnark/internal/utils"
 	"github.com/consensys/gnark/logger"
+	limbs "github.com/consensys/gnark/std/internal/limbcomposition"
+	"github.com/consensys/gnark/std/math/fieldextension"
 	"github.com/consensys/gnark/std/rangecheck"
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/constraints"
@@ -21,44 +25,39 @@ import (
 type Field[T FieldParams] struct {
 	// api is the native API
 	api frontend.API
+	// extensionApi is the extension API when we need to perform multiplication checks over the extension field
+	extensionApi fieldextension.Field
 
-	// f carries the ring parameters
-	fParams T
+	// fParams carries the ring parameters
+	fParams staticFieldParams[T]
 
 	// maxOf is the maximum overflow before the element must be reduced.
 	maxOf     uint
 	maxOfOnce sync.Once
 
 	// constants for often used elements n, 0 and 1. Allocated only once
-	nConstOnce        sync.Once
-	nConst            *Element[T]
-	nprevConstOnce    sync.Once
-	nprevConst        *Element[T]
-	zeroConstOnce     sync.Once
-	zeroConst         *Element[T]
-	oneConstOnce      sync.Once
-	oneConst          *Element[T]
-	shortOneConstOnce sync.Once
-	shortOneConst     *Element[T]
+	nConstOnce     sync.Once
+	nConst         *Element[T]
+	nprevConstOnce sync.Once
+	nprevConst     *Element[T]
+	zeroConstOnce  sync.Once
+	zeroConst      *Element[T]
+	oneConstOnce   sync.Once
+	oneConst       *Element[T]
 
 	log zerolog.Logger
 
 	constrainedLimbs map[[16]byte]struct{}
 	checker          frontend.Rangechecker
 
-	mulChecks []mulCheck[T]
+	deferredChecks []deferredChecker
 }
 
 type ctxKey[T FieldParams] struct{}
 
 // NewField returns an object to be used in-circuit to perform emulated
 // arithmetic over the field defined by type parameter [FieldParams]. The
-// operations on this type are defined on [Element]. There is also another type
-// [FieldAPI] implementing [frontend.API] which can be used in place of native
-// API for existing circuits.
-//
-// This is an experimental feature and performing emulated arithmetic in-circuit
-// is extremly costly. See package doc for more info.
+// operations on this type are defined on [Element].
 func NewField[T FieldParams](native frontend.API) (*Field[T], error) {
 	if storer, ok := native.(kvstore.Store); ok {
 		ff := storer.GetKeyValue(ctxKey[T]{})
@@ -71,22 +70,31 @@ func NewField[T FieldParams](native frontend.API) (*Field[T], error) {
 		log:              logger.Logger(),
 		constrainedLimbs: make(map[[16]byte]struct{}),
 		checker:          rangecheck.New(native),
+		fParams:          newStaticFieldParams[T](native.Compiler().Field()),
+	}
+	if smallfields.IsSmallField(native.Compiler().Field()) {
+		f.log.Debug().Msg("using small native field, multiplication checks will be performed in extension field")
+		extapi, err := fieldextension.NewExtension(native)
+		if err != nil {
+			return nil, fmt.Errorf("extension field: %w", err)
+		}
+		f.extensionApi = extapi
 	}
 
 	// ensure prime is correctly set
 	if f.fParams.IsPrime() {
 		if !f.fParams.Modulus().ProbablyPrime(20) {
-			return nil, fmt.Errorf("invalid parametrization: modulus is not prime")
+			return nil, errors.New("invalid parametrization: modulus is not prime")
 		}
 	}
 
 	if f.fParams.BitsPerLimb() < 3 {
 		// even three is way too small, but it should probably work.
-		return nil, fmt.Errorf("nbBits must be at least 3")
+		return nil, errors.New("nbBits must be at least 3")
 	}
 
 	if f.fParams.Modulus().Cmp(big.NewInt(1)) < 1 {
-		return nil, fmt.Errorf("n must be at least 2")
+		return nil, errors.New("n must be at least 2")
 	}
 
 	nbLimbs := (uint(f.fParams.Modulus().BitLen()) + f.fParams.BitsPerLimb() - 1) / f.fParams.BitsPerLimb()
@@ -95,14 +103,14 @@ func NewField[T FieldParams](native frontend.API) (*Field[T], error) {
 	}
 
 	if f.api == nil {
-		return f, fmt.Errorf("missing api")
+		return f, errors.New("missing api")
 	}
 
 	if uint(f.api.Compiler().FieldBitLen()) < 2*f.fParams.BitsPerLimb()+1 {
 		return nil, fmt.Errorf("elements with limb length %d does not fit into scalar field", f.fParams.BitsPerLimb())
 	}
 
-	native.Compiler().Defer(f.performMulChecks)
+	native.Compiler().Defer(f.performDeferredChecks)
 	if storer, ok := native.(kvstore.Store); ok {
 		storer.SetKeyValue(ctxKey[T]{}, f)
 	}
@@ -128,14 +136,17 @@ func (f *Field[T]) NewElement(v interface{}) *Element[T] {
 	if e, ok := v.([]frontend.Variable); ok {
 		return f.packLimbs(e, true)
 	}
-	c := ValueOf[T](v)
-	return &c
+	// the input was not a variable, so it must be a constant. Create a new
+	// element from it while setting isWitness flag to false. This ensures that
+	// we use the minimal number of limbs necessary.
+	c := newConstElement[T](f.api.Compiler().Field(), v, false)
+	return c
 }
 
 // Zero returns zero as a constant.
 func (f *Field[T]) Zero() *Element[T] {
 	f.zeroConstOnce.Do(func() {
-		f.zeroConst = newConstElement[T](0)
+		f.zeroConst = f.newInternalElement([]frontend.Variable{}, 0)
 	})
 	return f.zeroConst
 }
@@ -143,23 +154,15 @@ func (f *Field[T]) Zero() *Element[T] {
 // One returns one as a constant.
 func (f *Field[T]) One() *Element[T] {
 	f.oneConstOnce.Do(func() {
-		f.oneConst = newConstElement[T](1)
+		f.oneConst = f.newInternalElement([]frontend.Variable{1}, 0)
 	})
 	return f.oneConst
-}
-
-// shortOne returns one as a constant stored in a single limb.
-func (f *Field[T]) shortOne() *Element[T] {
-	f.shortOneConstOnce.Do(func() {
-		f.shortOneConst = f.newInternalElement([]frontend.Variable{1}, 0)
-	})
-	return f.shortOneConst
 }
 
 // Modulus returns the modulus of the emulated ring as a constant.
 func (f *Field[T]) Modulus() *Element[T] {
 	f.nConstOnce.Do(func() {
-		f.nConst = newConstElement[T](f.fParams.Modulus())
+		f.nConst = newConstElement[T](f.api.Compiler().Field(), f.fParams.Modulus(), false)
 	})
 	return f.nConst
 }
@@ -167,7 +170,7 @@ func (f *Field[T]) Modulus() *Element[T] {
 // modulusPrev returns modulus-1 as a constant.
 func (f *Field[T]) modulusPrev() *Element[T] {
 	f.nprevConstOnce.Do(func() {
-		f.nprevConst = newConstElement[T](new(big.Int).Sub(f.fParams.Modulus(), big.NewInt(1)))
+		f.nprevConst = newConstElement[T](f.api.Compiler().Field(), new(big.Int).Sub(f.fParams.Modulus(), big.NewInt(1)), false)
 	})
 	return f.nprevConst
 }
@@ -188,6 +191,11 @@ func (f *Field[T]) enforceWidthConditional(a *Element[T]) (didConstrain bool) {
 		// for some reason called on nil
 		return false
 	}
+	// ensure that when the element is defined in-circuit with [ValueOf] method
+	// (as a constant), then we decompose it into limbs. When [ValueOf] is called
+	// for a witness assignment, then [Element.Initialize] is already called at
+	// witness parsing time. In that case, the below operation is no-op.
+	a.Initialize(f.api.Compiler().Field())
 	if a.internal {
 		// internal elements are already constrained in the method which returned it
 		return false
@@ -240,6 +248,15 @@ func (f *Field[T]) enforceWidthConditional(a *Element[T]) (didConstrain bool) {
 }
 
 func (f *Field[T]) constantValue(v *Element[T]) (*big.Int, bool) {
+	// this case happens when we have called [ValueOf] inside a circuit as
+	// [Element.Initialize] has not been called (Limbs are nil). In this case,
+	// we can directly use the witness value as the constant value.
+	if v.Limbs == nil && v.witnessValue != nil {
+		return new(big.Int).Set(v.witnessValue), true
+	}
+
+	// otherwise - it may happen that the user has manually constructed [Element] from constant limbs.
+	// In this case, we can recompose the constant value from the limbs.
 	var ok bool
 
 	constLimbs := make([]*big.Int, len(v.Limbs))
@@ -251,7 +268,7 @@ func (f *Field[T]) constantValue(v *Element[T]) (*big.Int, bool) {
 	}
 
 	res := new(big.Int)
-	if err := recompose(constLimbs, f.fParams.BitsPerLimb(), res); err != nil {
+	if err := limbs.Recompose(constLimbs, f.fParams.BitsPerLimb(), res); err != nil {
 		f.log.Error().Err(err).Msg("recomposing constant")
 		return nil, false
 	}
@@ -278,6 +295,18 @@ func max[T constraints.Ordered](a ...T) T {
 		if v > m {
 			m = v
 		}
+	}
+	return m
+}
+
+func sum[T constraints.Ordered](a ...T) T {
+	if len(a) == 0 {
+		var f T
+		return f
+	}
+	m := a[0]
+	for _, v := range a[1:] {
+		m += v
 	}
 	return m
 }

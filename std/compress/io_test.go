@@ -1,9 +1,15 @@
-package compress
+package compress_test
 
 import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
+	"testing"
+
+	"github.com/consensys/gnark/std/compress"
+	"github.com/consensys/gnark/std/compress/internal"
+
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bls12-377/fr"
 	"github.com/consensys/gnark-crypto/hash"
@@ -11,11 +17,8 @@ import (
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/scs"
 	"github.com/consensys/gnark/profile"
-	test_vector_utils "github.com/consensys/gnark/std/utils/test_vectors_utils"
 	"github.com/consensys/gnark/test"
 	"github.com/stretchr/testify/assert"
-	"math/big"
-	"testing"
 )
 
 func TestShiftLeft(t *testing.T) {
@@ -42,8 +45,8 @@ func TestShiftLeft(t *testing.T) {
 		}
 
 		assignment := shiftLeftCircuit{
-			Slice:       test_vector_utils.ToVariableSlice(b),
-			Shifted:     test_vector_utils.ToVariableSlice(shifted),
+			Slice:       internal.ToVariableSlice(b),
+			Shifted:     internal.ToVariableSlice(shifted),
 			ShiftAmount: shiftAmount,
 		}
 
@@ -76,7 +79,7 @@ func (c *shiftLeftCircuit) Define(api frontend.API) error {
 	if len(c.Slice) != len(c.Shifted) {
 		panic("witness length mismatch")
 	}
-	shifted := ShiftLeft(api, c.Slice, c.ShiftAmount)
+	shifted := compress.ShiftLeft(api, c.Slice, c.ShiftAmount)
 	if len(shifted) != len(c.Shifted) {
 		panic("wrong length")
 	}
@@ -93,14 +96,14 @@ func TestChecksumBytes(t *testing.T) {
 		_, err := rand.Read(b)
 		assert.NoError(t, err)
 
-		checksum := ChecksumPaddedBytes(b, len(b), hash.MIMC_BLS12_377.New(), fr.Bits)
+		checksum := compress.ChecksumPaddedBytes(b, len(b), hash.MIMC_BLS12_377.New(), fr.Bits)
 
 		circuit := checksumTestCircuit{
 			Bytes: make([]frontend.Variable, len(b)),
 		}
 
 		assignment := checksumTestCircuit{
-			Bytes: test_vector_utils.ToVariableSlice(b),
+			Bytes: internal.ToVariableSlice(b),
 			Sum:   checksum,
 		}
 
@@ -115,8 +118,8 @@ type checksumTestCircuit struct {
 }
 
 func (c *checksumTestCircuit) Define(api frontend.API) error {
-	Packed := append(Pack(api, c.Bytes, 8), len(c.Bytes))
-	return AssertChecksumEquals(api, Packed, c.Sum)
+	Packed := append(compress.Pack(api, c.Bytes, 8), len(c.Bytes))
+	return compress.AssertChecksumEquals(api, Packed, c.Sum)
 }
 
 func TestSetNumNbBits(t *testing.T) {
@@ -131,8 +134,8 @@ func TestSetNumNbBits(t *testing.T) {
 			test.WithCurves(ecc.BLS12_377), test.WithBackends(backend.PLONK),
 			test.WithValidAssignment(&testSetNumNbBitsCircuit{
 				increases: increases,
-				Words:     test_vector_utils.ToVariableSlice(words),
-				Nums:      test_vector_utils.ToVariableSlice(nums),
+				Words:     internal.ToVariableSlice(words),
+				Nums:      internal.ToVariableSlice(nums),
 			}))
 	}
 
@@ -194,7 +197,7 @@ func (c *testSetNumNbBitsCircuit) Define(api frontend.API) error {
 		return errors.New("must have as many steps as read values")
 	}
 	l := 1
-	nr := NewNumReader(api, c.Words, l, 1)
+	nr := compress.NewNumReader(api, c.Words, l, 1)
 	for i := range c.increases {
 		l += int(c.increases[i])
 		nr.SetNumNbBits(l)

@@ -2,10 +2,11 @@ package cmp
 
 import (
 	"fmt"
+	"math/big"
+
 	"github.com/consensys/gnark/constraint/solver"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/math/bits"
-	"math/big"
 )
 
 func init() {
@@ -29,7 +30,7 @@ func GetHints() []solver.Hint {
 // NewBoundedComparator, for more information.
 type BoundedComparator struct {
 	// absDiffUppBitLen is the assumed maximum length for the binary representation
-	// of |a - b|. Every method preforms exactly one binary decomposition of this
+	// of |a - b|. Every method performs exactly one binary decomposition of this
 	// length.
 	absDiffUppBitLen int
 	api              frontend.API

@@ -2,21 +2,27 @@ package schema
 
 import (
 	"fmt"
+	"math/big"
 	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/consensys/gnark/frontend/schema/internal/reflectwalk"
+	"github.com/consensys/gnark/logger"
 )
 
 // Walk walks through the provided object and stops when it encounters objects of type tLeaf
 //
 // It returns the number of secret and public leafs encountered during the walk.
-func Walk(circuit interface{}, tLeaf reflect.Type, handler LeafHandler) (count LeafCount, err error) {
+//
+// The argument field is used to initialize the witness elements (if they
+// implement the Initializable interface).
+func Walk(field *big.Int, circuit interface{}, tLeaf reflect.Type, handler LeafHandler) (count LeafCount, err error) {
 	w := walker{
 		target:      tLeaf,
 		targetSlice: reflect.SliceOf(tLeaf),
 		handler:     handler,
+		field:       field,
 	}
 	err = reflectwalk.Walk(circuit, &w)
 	if err == reflectwalk.ErrSkipEntry {
@@ -43,6 +49,7 @@ type walker struct {
 	targetSlice        reflect.Type
 	path               pathStack
 	nbPublic, nbSecret int
+	field              *big.Int
 }
 
 // Interface handles interface values as they are encountered during the walk.
@@ -82,7 +89,8 @@ func (w *walker) Pointer(value reflect.Value) error {
 func (w *walker) Slice(value reflect.Value) error {
 	if value.Type() == w.targetSlice {
 		if value.Len() == 0 {
-			fmt.Printf("ignoring uninitialized slice: %s %s\n", w.name(), reflect.SliceOf(w.target).String())
+			log := logger.Logger()
+			log.Warn().Str("slice name", w.name()).Str("slice type", reflect.SliceOf(w.target).String()).Msg("ignoring uninitialized slice")
 			return nil
 		}
 		return w.handleLeaves(value)
@@ -101,8 +109,8 @@ func (w *walker) arraySliceElem(index int, v reflect.Value) error {
 		// field emulation to "deinitialize" the elements. Maybe we can have a
 		// destructor/deinit hook also?
 		value := v.Addr().Interface()
-		if ih, hasInitHook := value.(InitHook); hasInitHook {
-			ih.GnarkInitHook()
+		if ih, hasInitHook := value.(Initializable); hasInitHook {
+			ih.Initialize(w.field)
 		}
 	}
 	return nil
@@ -173,8 +181,8 @@ func (w *walker) StructField(sf reflect.StructField, v reflect.Value) error {
 		// field emulation to "deinitialize" the elements. Maybe we can have a
 		// destructor/deinit hook also?
 		value := v.Addr().Interface()
-		if ih, hasInitHook := value.(InitHook); hasInitHook {
-			ih.GnarkInitHook()
+		if ih, hasInitHook := value.(Initializable); hasInitHook {
+			ih.Initialize(w.field)
 		}
 	}
 

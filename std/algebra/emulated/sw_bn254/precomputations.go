@@ -31,28 +31,42 @@ func precomputeLines(Q bn254.G2Affine) lineEvaluations {
 
 func (p *Pairing) computeLines(Q *g2AffP) lineEvaluations {
 
+	// check Q is on curve
+	Qaff := G2Affine{P: *Q, Lines: nil}
+	p.IsOnTwist(&Qaff)
+
 	var cLines lineEvaluations
 	Qacc := Q
-	QNeg := &g2AffP{
-		X: Q.X,
-		Y: *p.Ext2.Neg(&Q.Y),
-	}
 	n := len(bn254.LoopCounter)
 	Qacc, cLines[0][n-2] = p.doubleStep(Qacc)
-	cLines[1][n-3] = p.lineCompute(Qacc, QNeg)
+	cLines[1][n-3] = p.lineCompute(Qacc, Q)
 	Qacc, cLines[0][n-3] = p.addStep(Qacc, Q)
 	for i := n - 4; i >= 0; i-- {
 		switch loopCounter[i] {
 		case 0:
 			Qacc, cLines[0][i] = p.doubleStep(Qacc)
 		case 1:
-			Qacc, cLines[0][i], cLines[1][i] = p.doubleAndAddStep(Qacc, Q)
+			Qacc, cLines[0][i], cLines[1][i] = p.doubleAndAddStep(Qacc, Q, false)
 		case -1:
-			Qacc, cLines[0][i], cLines[1][i] = p.doubleAndAddStep(Qacc, QNeg)
+			Qacc, cLines[0][i], cLines[1][i] = p.doubleAndAddStep(Qacc, Q, true)
 		default:
 			return lineEvaluations{}
 		}
 	}
+
+	// Check that Q is on G2 subgroup:
+	// 		[r]Q == 0 <==> [6x₀+2]Q + ψ(Q) + ψ³(Q) = ψ²(Q).
+	// This is a valid short vector since x₀ ≠ 4 mod 13 and x₀ ≠ 92 mod 97.
+	// See Sec. 3.1.2 (Remark 2) in https://eprint.iacr.org/2022/348.
+	// This test is equivalent to [computeG2ShortVector] in [AssertIsOnG2].
+	//
+	// At this point Qacc = [6x₀+2]Q.
+	psiQ := p.g2.psi(&Qaff)  // ψ(Q)
+	psi2Q := p.g2.phi(&Qaff) // ϕ(Q)=ψ²(Q)
+	psi3Q := p.g2.psi(psi2Q) // ψ³(Q)
+	lhs := p.g2.add(&G2Affine{P: *Qacc, Lines: nil}, psiQ)
+	lhs = p.g2.add(lhs, psi3Q)
+	p.g2.AssertIsEqual(lhs, psi2Q)
 
 	Q1X := p.Ext2.Conjugate(&Q.X)
 	Q1X = p.Ext2.MulByNonResidue1Power2(Q1X)
@@ -64,7 +78,6 @@ func (p *Pairing) computeLines(Q *g2AffP) lineEvaluations {
 	}
 
 	Q2Y := p.Ext2.MulByNonResidue2Power3(&Q.Y)
-	Q2Y = p.Ext2.Neg(Q2Y)
 	Q2 := &g2AffP{
 		X: *p.Ext2.MulByNonResidue2Power2(&Q.X),
 		Y: *Q2Y,

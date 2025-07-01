@@ -1,18 +1,5 @@
-/*
-Copyright © 2020 ConsenSys
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2020-2025 Consensys Software Inc.
+// Licensed under the Apache License, Version 2.0. See the LICENSE file for details.
 
 package fields_bls24315
 
@@ -133,7 +120,7 @@ func (e *E24) Add(api frontend.API, e1, e2 E24) *E24 {
 	return e
 }
 
-// Sub substracts 2 elmts in Fp24
+// Sub subtracts 2 elmts in Fp24
 func (e *E24) Sub(api frontend.API, e1, e2 E24) *E24 {
 	e.D0.Sub(api, e1.D0, e2.D0)
 	e.D1.Sub(api, e1.D1, e2.D1)
